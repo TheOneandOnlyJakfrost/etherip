@@ -58,14 +58,10 @@ public class CIPReadDataProtocol extends ProtocolAdapter
     }
 
     @Override
-    public void decode(final ByteBuffer buf, final int available,
-            final StringBuilder log) throws Exception
-    {
-        if (available <= 0)
-        {
+    public void decode(final ByteBuffer buf, final int available, final StringBuilder log) throws Exception {
+        if (available <= 0) {
             this.data = null;
-            if (log != null)
-            {
+            if (log != null) {
                 log.append("USINT type, data        : - nothing-\n");
             }
             return;

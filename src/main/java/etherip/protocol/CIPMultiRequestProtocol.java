@@ -7,9 +7,9 @@
  *******************************************************************************/
 package etherip.protocol;
 
-import java.nio.ByteBuffer;
-
 import etherip.types.CNService;
+
+import java.nio.ByteBuffer;
 
 /**
  * Protocol for {@link CNService#CIP_MultiRequest}

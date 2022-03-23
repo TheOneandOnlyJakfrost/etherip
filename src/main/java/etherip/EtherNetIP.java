@@ -16,6 +16,7 @@ import static etherip.types.CNService.Get_Attribute_Single;
 import java.nio.BufferUnderflowException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,33 +26,8 @@ import etherip.data.EthernetLink;
 import etherip.data.Identity;
 import etherip.data.InterfaceConfiguration;
 import etherip.data.TcpIpInterface;
-import etherip.protocol.CIPMultiRequestProtocol;
-import etherip.protocol.Connection;
-import etherip.protocol.ConnectionDataProtocol;
-import etherip.protocol.Encapsulation;
-import etherip.protocol.GetConnectionDataProtocol;
-import etherip.protocol.GetEthernetLinkProtocol;
-import etherip.protocol.GetHexStringDataProtocol;
-import etherip.protocol.GetIdentityProtocol;
-import etherip.protocol.GetIntAttributeProtocol;
-import etherip.protocol.GetInterfaceConfigurationProtocol;
-import etherip.protocol.GetPhysicalLinkObjectProtocol;
-import etherip.protocol.GetShortAttributeProtocol;
-import etherip.protocol.GetStringAttributeProtocol;
-import etherip.protocol.GetTcpIpInterfaceProtocol;
-import etherip.protocol.ListIdenties;
-import etherip.protocol.ListServices;
+import etherip.protocol.*;
 import etherip.protocol.ListServicesProtocol.Service;
-import etherip.protocol.MRChipReadProtocol;
-import etherip.protocol.MRChipWriteProtocol;
-import etherip.protocol.MessageRouterProtocol;
-import etherip.protocol.Protocol;
-import etherip.protocol.ProtocolAdapter;
-import etherip.protocol.RegisterSession;
-import etherip.protocol.SendRRDataProtocol;
-import etherip.protocol.TcpConnection;
-import etherip.protocol.UdpConnection;
-import etherip.protocol.UnconnectedSendProtocol;
 import etherip.types.CIPData;
 import etherip.types.CNClassPath;
 import etherip.types.CNPath;
@@ -492,12 +468,48 @@ public class EtherNetIP implements AutoCloseable
 	    sendMultiMessages(maxNumberOfRequestsPerGroup, reads);
 
 	    final CIPData[] results = new CIPData[reads.length];
-        for (int i=0; i<results.length; ++i)
-        {
+        for (int i=0; i<results.length; ++i) {
             results[i] = reads[i].getData();
         }
-
         return results;
+    }
+
+    /**
+     * Establishes a local connection to the target device by using the Forward_Open (0x54) service.
+     * Once the connection has been established, A CIPRead_Data (0x4C) service request is sent for
+     * each tag requested. Finally, when all tag requests have been sent, a Forward_Close (0x4E)
+     * service is sent to terminate the connection.
+     *
+     * @param tags - the list of tags to read
+     * @return - a list with a {@link TagReadReply} for each tag requested
+     * @throws Exception
+     */
+    public List<TagReadReply> connectAndReadTags(String... tags) throws Exception {
+        // Forward open protocol - The Forward Open request sets up network, transport, and
+        // application connections.
+        int sessionId = this.connection.getSession();
+        ForwardOpenProtocol forwardOpen = new ForwardOpenProtocol();
+        SendRRDataProtocol sendRRDataOpen = new SendRRDataProtocol(forwardOpen);
+        Encapsulation openEncapsulation = new Encapsulation(SendRRData, sessionId, sendRRDataOpen);
+        this.connection.execute(openEncapsulation);
+        // Once a local connection has been established with the target device, we can start
+        // reading all the tags and storing the results in a list
+        List<TagReadReply> result = new ArrayList<>();
+        for(int i = 0; i < tags.length; i++) {
+            MRChipReadProtocol readProtocol = new MRChipReadProtocol(tags[i]);
+            SendRRDataProtocol sendRRDataProtocol = new SendRRDataProtocol(readProtocol);
+            connection.execute(new Encapsulation(SendRRData, sessionId, sendRRDataProtocol));
+            int status = readProtocol.getStatus();
+            CIPData data = readProtocol.getData();
+            result.add(new TagReadReply(tags[i], status, data));
+        }
+        // Forward close protocol
+        short connectionSerialNumber = forwardOpen.getConnectionSerialNumber();
+        ForwardCloseProtocol forwardClose = new ForwardCloseProtocol(connectionSerialNumber);
+        SendRRDataProtocol sendRRDataClose = new SendRRDataProtocol(forwardClose);
+        Encapsulation closeEncap = new Encapsulation(SendRRData, sessionId, sendRRDataClose);
+        this.connection.execute(closeEncap);
+        return result;
     }
 
     /** send multiple messages in a single transaction. 
@@ -638,4 +650,8 @@ public class EtherNetIP implements AutoCloseable
     public Connection getConnection() {
         return this.connection;
     }
+
+    private Function<String, MRChipReadProtocol> toReadProtocol = tag -> {
+        return new MRChipReadProtocol(tag);
+    };
 }

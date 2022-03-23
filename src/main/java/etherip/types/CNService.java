@@ -15,8 +15,7 @@ package etherip.types;
  * @author Kay Kasemir, László Pataki
  */
 @SuppressWarnings("nls")
-public enum CNService
-{
+public enum CNService {
     Get_Attribute_All(0x01),
     Get_Attributes_List(0x03), // Logix5000 Data Access
     Get_Attribute_Single(0x0E), // Spec 6 p. 43
@@ -28,6 +27,7 @@ public enum CNService
     CIP_WriteDataFragmented(0x53), // Logix5000 Data Access
     CM_Unconnected_Send(0x52),
     CM_ForwardOpen(0x54),
+    CM_LargeForwardOpen(0x5b),
     Get_Instance_Attribute_List(0x55), // Logix5000 Data Access
     Get_Connection_Data(0x56), // CIP VOL1_3.3: 3-5.5
     Get_Attribute_All_Reply(0x01 | 0x80),
@@ -86,10 +86,13 @@ public enum CNService
      */
     public CNService getReply()
     {
-        if (this == CM_Unconnected_Send)
-        {
+        if (this == CM_Unconnected_Send) {
             return null;
         }
+        // Forward Open and Forward Close
+        if(this == CM_ForwardOpen) return CM_ForwardOpen_Reply;
+        if(this == CM_ForwardClose) return CM_ForwardClose_Reply;
+
         // Is this already a 'reply'?
         if ((this.code & 0x80) == 0x80)
         {

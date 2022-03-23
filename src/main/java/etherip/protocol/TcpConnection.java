@@ -10,8 +10,12 @@ package etherip.protocol;
 import static etherip.EtherNetIP.logger;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.SocketAddress;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.util.Enumeration;
 import java.util.logging.Level;
 
 import etherip.util.Hexdump;
@@ -36,10 +40,8 @@ public class TcpConnection extends Connection
      *            Slot number 0, 1, .. of the controller within PLC crate
      * @throws Exception
      */
-    public TcpConnection(final String address, final int slot) throws Exception
-    {
+    public TcpConnection(final String address, final int slot) throws Exception {
         super(address, slot);
-
         this.channel = AsynchronousSocketChannel.open();
         this.channel.connect(new InetSocketAddress(address, this.port))
                 .get(this.timeout_ms, MILLISECONDS);

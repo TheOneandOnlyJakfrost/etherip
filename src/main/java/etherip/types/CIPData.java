@@ -22,21 +22,29 @@ import etherip.protocol.Connection;
  * <p>
  * Raw CIP data is kept in a <code>byte[]</code>. This class can decode the data or manipulate it.
  * <p>
- * Note that all operations that 'set' the value require that the CIPData already holds the respective type. For example, setting a CIPData of type REAL to an integer value will still result in a
- * REAL, not change the type to INT. Setting a CIPData of type INT to a floating point value will truncate the floating point to an integer, since the CIPData remains an INT. Only CIPData with a
- * string-containing STRUCT can be set to a string.
+ * Note that all operations that 'set' the value require that the CIPData already holds the respective type. For
+ * example, setting a CIPData of type REAL to an integer value will still result in a REAL, not change the type to INT.
+ * Setting a CIPData of type INT to a floating point value will truncate the floating point to an integer, since the
+ * CIPData remains an INT. Only CIPData with a string-containing STRUCT can be set to a string.
  *
  * @author Kay Kasemir
  */
 @SuppressWarnings("nls")
 final public class CIPData
 {
+
+    /**
+     * CIP Vol 1, Appendix C-6.1 (page 1260)  defines all the available types and their codes
+     */
     public static enum Type
     {
         BOOL(0x00C1, 1),
         SINT(0x00C2, 1),
         INT(0x00C3, 2),
         DINT(0x00C4, 4),
+        LINT(0x00C5, 8),
+        USINT(0x00C6, 1),
+        UINT(0x00C7, 2),
         REAL(0x00CA, 4),
         BITS(0x00D3, 4),
         // Order of enums matter: BITS is the last numeric type (not-string)
@@ -62,8 +70,7 @@ final public class CIPData
             }
         }
 
-        public static Type forCode(final short code) throws Exception
-        {
+        public static Type forCode(final short code) throws Exception {
             final Type t = reverse.get(code);
             if (reverse == null)
             {
@@ -84,7 +91,7 @@ final public class CIPData
         {
             return this.name() + String.format(" (0x%04X)", this.code);
         }
-    };
+    }
 
     /** Data type */
     final private Type type;
@@ -107,21 +114,23 @@ final public class CIPData
      */
     public CIPData(final Type type, final int elements) throws Exception
     {
-        switch (type)
-        {
-        case BOOL:
-        case SINT:
-        case INT:
-        case DINT:
-        case BITS:
-        case REAL:
-            this.data = ByteBuffer.allocate(type.element_size * elements);
-            this.data.order(Connection.BYTE_ORDER);
-            this.type = type;
-            this.elements = (short) elements;
-            break;
-        default:
-            throw new Exception("Type " + type + " not handled");
+        switch (type) {
+            case BOOL:
+            case SINT:
+            case INT:
+            case DINT:
+            case LINT:
+            case USINT:
+            case UINT:
+            case BITS:
+            case REAL:
+                this.data = ByteBuffer.allocate(type.element_size * elements);
+                this.data.order(Connection.BYTE_ORDER);
+                this.type = type;
+                this.elements = (short) elements;
+                break;
+            default:
+                throw new Exception("Type " + type + " not handled");
         }
     }
 
@@ -145,23 +154,23 @@ final public class CIPData
     }
 
     /** @return Number of elements */
-    final private short determineElementCount() throws Exception
-    {
-        switch (this.type)
-        {
-        case BOOL:
-        case SINT:
-        case INT:
-        case DINT:
-        case BITS:
-        case REAL:
-            return (short) (this.data.capacity() / this.type.element_size);
-        case STRUCT:
-        {
-            return 1; // We do not know without byte packing details but at least 1. 
-        }
-        default:
-            throw new Exception("Type " + this.type + " not handled");
+    private short determineElementCount() throws Exception {
+        switch (this.type) {
+            case BOOL:
+            case SINT:
+            case INT:
+            case DINT:
+            case LINT:
+            case USINT:
+            case UINT:
+            case BITS:
+            case REAL:
+                return (short) (this.data.capacity() / this.type.element_size);
+            case STRUCT: {
+                return 1; // We do not know without byte packing details but at least 1.
+            }
+            default:
+                throw new Exception("Type " + this.type + " not handled");
         }
     }
 
@@ -196,26 +205,28 @@ final public class CIPData
      * @throws IndexOutOfBoundsException
      *             if index is invalid
      */
-    final synchronized public Number getNumber(final int index)
-            throws Exception, IndexOutOfBoundsException
-    {
-        switch (this.type)
-        {
-        case BOOL:
-        case SINT:
-            return new Byte(this.data.get(this.type.element_size * index));
-        case INT:
-            return new Short(
-                    this.data.getShort(this.type.element_size * index));
-        case DINT:
-        case BITS:
-            return new Integer(
-                    this.data.getInt(this.type.element_size * index));
-        case REAL:
-            return new Float(
-                    this.data.getFloat(this.type.element_size * index));
-        default:
-            throw new Exception("Cannot retrieve Number from " + this.type);
+    final synchronized public Number getNumber(final int index) throws Exception,
+            IndexOutOfBoundsException {
+        switch (this.type) {
+            case BOOL:
+            case SINT:
+            case USINT:
+                return new Byte(this.data.get(this.type.element_size * index));
+            case INT:
+            case UINT:
+                return new Short(
+                        this.data.getShort(this.type.element_size * index));
+            case DINT:
+            case BITS:
+                return new Integer(
+                        this.data.getInt(this.type.element_size * index));
+            case LINT:
+                return new Long(this.data.getLong(this.type.element_size * index));
+            case REAL:
+                return new Float(
+                        this.data.getFloat(this.type.element_size * index));
+            default:
+                throw new Exception("Cannot retrieve Number from " + this.type);
         }
     }
 
