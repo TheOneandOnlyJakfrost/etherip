@@ -16,9 +16,9 @@ public class DemoTest {
         try {
             EtherNetIP plc = new EtherNetIP("10.0.1.100", 0);
             plc.connectTcp();
-            List<TagReadReply> datas = plc.connectAndReadTags("Sensor1", "Sensor2" , "Sensor10");
+            List<TagReadResponse> datas = plc.connectAndReadTags("Sensor1", "Sensor2" , "Sensor10");
             datas.forEach(each -> {
-                logger.info("Tag name:" + each.getTag() + " is valid ? " + each.isValid());
+                logger.info("Sensor id:" + each.getSensorId() + " Tag name:" + each.getTag() + " is valid ? " + each.isValid());
             });
 
         } catch (Exception e) {

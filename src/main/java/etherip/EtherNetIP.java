@@ -48,9 +48,13 @@ public class EtherNetIP implements AutoCloseable
 
 	private static final int MAX_REQUEST_SIZE = 450;
 
-    final private String address;
-    final private int slot;
+    private String address;
+    private int slot = 0;
     private Connection connection = null;
+
+    public EtherNetIP() {
+
+    }
 
     /** Initialize
      *  @param address IP address of device
@@ -62,11 +66,33 @@ public class EtherNetIP implements AutoCloseable
         this.slot = slot;
     }
 
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setSlot(int slot) {
+        this.slot = slot;
+    }
+
+    public int getSlot() {
+        return slot;
+    }
+
+    public boolean hasAddress() {
+        return address != null && !address.isEmpty();
+    }
+
     /**
      * Connect to device via TCP, register session
      */
     public void connectTcp() throws Exception
     {
+        if(address == null || address.isEmpty())
+            throw new IllegalArgumentException("Address cannot be empty");
         this.connection = new TcpConnection(this.address, this.slot);
         this.registerSession();
     }
@@ -474,17 +500,24 @@ public class EtherNetIP implements AutoCloseable
         return results;
     }
 
+    public List<TagReadResponse> connectAndReadTags(String... tags) throws Exception {
+        List<TagReadRequest> requests = new ArrayList<>();
+        for(int i = 0; i < tags.length; i++)
+            requests.add(new TagReadRequest(i, tags[i]));
+        return connectAndReadTags(requests);
+    }
+
     /**
      * Establishes a local connection to the target device by using the Forward_Open (0x54) service.
      * Once the connection has been established, A CIPRead_Data (0x4C) service request is sent for
      * each tag requested. Finally, when all tag requests have been sent, a Forward_Close (0x4E)
      * service is sent to terminate the connection.
      *
-     * @param tags - the list of tags to read
-     * @return - a list with a {@link TagReadReply} for each tag requested
+     * @param requests - the list of {@link TagReadRequest}
+     * @return - a list with a {@link TagReadResponse} for each tag requested
      * @throws Exception
      */
-    public List<TagReadReply> connectAndReadTags(String... tags) throws Exception {
+    public List<TagReadResponse> connectAndReadTags(List<TagReadRequest> requests) throws Exception {
         // Forward open protocol - The Forward Open request sets up network, transport, and
         // application connections.
         int sessionId = this.connection.getSession();
@@ -494,14 +527,15 @@ public class EtherNetIP implements AutoCloseable
         this.connection.execute(openEncapsulation);
         // Once a local connection has been established with the target device, we can start
         // reading all the tags and storing the results in a list
-        List<TagReadReply> result = new ArrayList<>();
-        for(int i = 0; i < tags.length; i++) {
-            MRChipReadProtocol readProtocol = new MRChipReadProtocol(tags[i]);
+        List<TagReadResponse> result = new ArrayList<>();
+        for(int i = 0; i < requests.size(); i++) {
+            TagReadRequest request = requests.get(i);
+            MRChipReadProtocol readProtocol = new MRChipReadProtocol(request.getTag());
             SendRRDataProtocol sendRRDataProtocol = new SendRRDataProtocol(readProtocol);
             connection.execute(new Encapsulation(SendRRData, sessionId, sendRRDataProtocol));
             int status = readProtocol.getStatus();
             CIPData data = readProtocol.getData();
-            result.add(new TagReadReply(tags[i], status, data));
+            result.add(new TagReadResponse(request.getSensorId(), request.getTag(), status, data));
         }
         // Forward close protocol
         short connectionSerialNumber = forwardOpen.getConnectionSerialNumber();

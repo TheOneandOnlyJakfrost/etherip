@@ -5,16 +5,28 @@ import etherip.types.CIPData;
 /**
  * Response after requesting reading a tag in a PLC.
  */
-public class TagReadReply {
+public class TagReadResponse {
 
+    private Integer sensorId;
     private String tag;
     private int status;
     private CIPData data;
 
-    public TagReadReply(String tag, int status, CIPData data) {
+    public TagReadResponse(Integer id, String tag, int status, CIPData data) {
+        this.sensorId = id;
         this.tag = tag;
         this.status = status;
         this.data = data;
+    }
+
+    public TagReadResponse(String tag, int status, CIPData data) {
+        this.tag = tag;
+        this.status = status;
+        this.data = data;
+    }
+
+    public Integer getSensorId() {
+        return sensorId;
     }
 
     public String getTag() {
